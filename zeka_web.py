@@ -6,7 +6,7 @@ from openai import OpenAI
 
 # ================== API ==================
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
+TAVILY_API_KEY = st.secrets["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"]
 
 # ================== SAYFA ==================
 st.set_page_config(
