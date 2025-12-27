@@ -1,132 +1,188 @@
 import streamlit as st
+import time
 import requests
+from openai import OpenAI
+from gradio_client import Client
+from PIL import Image
 from io import BytesIO
-from datetime import datetime
 
-# ------------------ AYARLAR ------------------
+# ================== API ==================
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
+
+# ================== SAYFA ==================
 st.set_page_config(
     page_title="Burak GPT",
-    page_icon="🧠",
+    page_icon="🤖",
     layout="centered"
 )
 
-st.title("🧠 Burak GPT")
-st.caption("Yazı • Araştırma • Görsel")
+# ================== CSS ==================
+st.markdown("""
+<style>
+.chat-container { max-width: 760px; margin: auto; }
+.user-msg {
+    background:#DCF8C6; padding:12px 16px; border-radius:15px;
+    margin:8px 0; text-align:right;
+}
+.bot-msg {
+    background:#F1F0F0; padding:12px 16px; border-radius:15px;
+    margin:8px 0;
+}
+.input-row {
+    display:flex; gap:6px; align-items:center;
+}
+.send-btn button {
+    background:black; color:white;
+    border-radius:10px; width:42px; height:42px;
+}
+.mode {
+    font-size:13px; color:gray; text-align:center;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# ------------------ SESSION ------------------
+# ================== SESSION ==================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "mode" not in st.session_state:
     st.session_state.mode = "chat"
 
-# ------------------ SIDEBAR ------------------
-with st.sidebar:
-    st.subheader("Mod Seç")
-    mode = st.radio(
-        "Ne yapmak istiyorsun?",
-        ["Sohbet", "Araştırma", "Görsel Oluştur"],
-        label_visibility="collapsed"
-    )
+# ================== BAŞLIK ==================
+st.markdown("<h2 style='text-align:center;'>🧠 Burak GPT</h2>", unsafe_allow_html=True)
+st.markdown(
+    f"<p class='mode'>Mod: {st.session_state.mode.upper()}</p>",
+    unsafe_allow_html=True
+)
 
-    if mode == "Sohbet":
-        st.session_state.mode = "chat"
-    elif mode == "Araştırma":
-        st.session_state.mode = "research"
-    else:
-        st.session_state.mode = "image"
+# ================== CHAT ==================
+st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
 
-# ------------------ FONKSİYON ------------------
-def generate_image(prompt):
-    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
-    headers = {
-        "Authorization": f"Bearer {st.secrets['HF_TOKEN']}"
-    }
-
-    for _ in range(3):  # 3 kere dene
-        response = requests.post(
-            API_URL,
-            headers=headers,
-            json={"inputs": prompt},
-            timeout=60
-        )
-
-        # Başarılıysa
-        if response.status_code == 200:
-            return response.content
-
-        # Model yükleniyorsa bekle
-        if response.status_code == 503:
-            st.info("🧠 Model yükleniyor, bekleniyor...")
-            import time
-            time.sleep(5)
-            continue
-
-        break
-
-    return None
-
-# ------------------ CHAT GEÇMİŞİ ------------------
 for msg in st.session_state.messages:
     if msg["role"] == "user":
-        st.chat_message("user").write(msg["content"])
+        st.markdown(f"<div class='user-msg'>{msg['content']}</div>", unsafe_allow_html=True)
 
     elif msg["role"] == "assistant":
-        st.chat_message("assistant").write(msg["content"])
+        st.markdown(
+            f"<div class='bot-msg'><b>Burak GPT:</b> {msg['content']}</div>",
+            unsafe_allow_html=True
+        )
 
     elif msg["role"] == "image":
         st.image(msg["content"], use_container_width=True)
 
-        st.download_button(
-            label="⬇️ Görseli indir",
-            data=msg["content"],
-            file_name=f"burak_gpt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-            mime="image/png"
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ================== FONKSİYONLAR ==================
+def tavily_search(query):
+    url = "https://api.tavily.com/search"
+    payload = {
+        "api_key": TAVILY_API_KEY,
+        "query": query,
+        "search_depth": "advanced",
+        "max_results": 5
+    }
+    r = requests.post(url, json=payload, timeout=30)
+    data = r.json()
+    return "\n".join([f"- {i['content']}" for i in data["results"]])
+
+
+def gpt_text(prompt):
+    res = client.responses.create(
+        model="gpt-4.1-mini",
+        input=prompt
+    )
+    return res.output_text.strip()
+
+
+def generate_image_from_space(prompt):
+    hf_client = Client("burak12321/burak-gpt-image")
+    result = hf_client.predict(
+        prompt=prompt,
+        api_name="/generate"
+    )
+
+    if result and result.get("url"):
+        r = requests.get(result["url"])
+        img = Image.open(BytesIO(r.content)).convert("RGB")
+        return img
+
+    return None
+
+# ================== INPUT ==================
+with st.form("chat_form", clear_on_submit=True):
+    col1, col2, col3 = st.columns([1,6,1])
+
+    with col1:
+        menu = st.selectbox(
+            "⋯",
+            ["💬 Sohbet", "🔍 Araştırma", "🖼️ Görsel"],
+            label_visibility="collapsed"
         )
 
-# ------------------ INPUT ------------------
-user_input = st.chat_input("Bir şey yaz...")
+    with col2:
+        user_input = st.text_input(
+            "Mesaj",
+            placeholder="Burak GPT’ye yaz…",
+            label_visibility="collapsed"
+        )
 
-if user_input:
+    with col3:
+        send = st.form_submit_button("➤")
+
+# ================== MOD ==================
+if menu == "💬 Sohbet":
+    st.session_state.mode = "chat"
+elif menu == "🔍 Araştırma":
+    st.session_state.mode = "research"
+elif menu == "🖼️ Görsel":
+    st.session_state.mode = "image"
+
+# ================== GÖNDER ==================
+if send and user_input.strip():
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
     })
 
-    # -------- SOHBET --------
-    if st.session_state.mode == "chat":
-        reply = f"🤖 Bunu düşündüm:\n\n{user_input}"
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": reply
-        })
+    with st.spinner("Burak GPT düşünüyor..."):
+        time.sleep(0.4)
 
-    # -------- ARAŞTIRMA --------
-    elif st.session_state.mode == "research":
-        reply = (
-            "🔎 Araştırma modu aktif.\n\n"
-            f"Başlık: {user_input}\n\n"
-            "Bu konu hakkında detaylı bir özet hazırlanabilir."
-        )
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": reply
-        })
-
-    # -------- GÖRSEL --------
-    elif st.session_state.mode == "image":
-        with st.spinner("🎨 Görsel oluşturuluyor..."):
-            image_bytes = generate_image(user_input)
-
-        if image_bytes:
-            st.session_state.messages.append({
-                "role": "image",
-                "content": image_bytes
-            })
-        else:
+        # CHAT
+        if st.session_state.mode == "chat":
+            reply = gpt_text(
+                f"Samimi, kısa ve emoji kullanarak cevap ver:\n{user_input}"
+            )
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": "❌ Görsel üretilemedi. Biraz sonra tekrar dene."
+                "content": reply
             })
+
+        # RESEARCH
+        elif st.session_state.mode == "research":
+            web = tavily_search(user_input)
+            reply = gpt_text(
+                f"Aşağıdaki internet sonuçlarını kullanarak açıkla:\n{web}"
+            )
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": reply
+            })
+
+        # IMAGE
+        elif st.session_state.mode == "image":
+            img = generate_image_from_space(user_input)
+
+            if img:
+                st.session_state.messages.append({
+                    "role": "image",
+                    "content": img
+                })
+            else:
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": "❌ Görsel üretilemedi. Biraz sonra tekrar dene."
+                })
 
     st.rerun()
