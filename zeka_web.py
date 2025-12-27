@@ -1,31 +1,37 @@
 import streamlit as st
+from openai import OpenAI
 
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+st.set_page_config(page_title="Benim Yapay Zekam", page_icon="🤖")
 st.title("🤖 Benim Yapay Zekam")
 st.write("Her gün biraz daha gelişiyorum.")
 
-# Hafıza
-if "gecmis" not in st.session_state:
-    st.session_state.gecmis = []
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-mesaj = st.text_input("Sen:")
-
-if mesaj:
-    mesaj_kucuk = mesaj.lower()
-
-    if "merhaba" in mesaj_kucuk:
-        cevap = "Merhaba! Seni görmek güzel 😄"
-    elif "nasılsın" in mesaj_kucuk:
-        cevap = "İyiyim. Konuştukça güçleniyorum."
-    elif "adın ne" in mesaj_kucuk:
-        cevap = "Henüz bir adım yok. İsim koymak ister misin?"
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.markdown(f"🧑 **Sen:** {msg['content']}")
     else:
-        cevap = "Bunu henüz bilmiyorum ama aklıma not aldım 🧠"
+        st.markdown(f"🤖 **AI:** {msg['content']}")
 
-    st.session_state.gecmis.append(("Sen", mesaj))
-    st.session_state.gecmis.append(("AI", cevap))
+user_input = st.text_input("Sen:")
 
-for kim, yazi in st.session_state.gecmis:
-    if kim == "Sen":
-        st.write(f"🧑 **Sen:** {yazi}")
-    else:
-        st.write(f"🤖 **AI:** {yazi}")
+if user_input:
+    st.session_state.messages.append(
+        {"role": "user", "content": user_input}
+    )
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=st.session_state.messages
+    )
+
+    ai_reply = response.choices[0].message.content
+
+    st.session_state.messages.append(
+        {"role": "assistant", "content": ai_reply}
+    )
+
+    st.experimental_rerun()
