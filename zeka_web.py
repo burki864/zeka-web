@@ -33,38 +33,69 @@ st.markdown("""
     border-radius: 10px;
     margin-top: 10px;
 }
+.user-box {
+    background: #e8e8e8;
+    padding: 10px;
+    border-radius: 10px;
+    margin-top: 10px;
+    text-align: right;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # Başlık
 st.markdown("<h2>👤 Ben</h2>", unsafe_allow_html=True)
 
+# 🧠 HAFIZA
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "system",
+            "content": "Senin adın Ben. Samimi, net ve kısa cevap ver. Türkçe konuş."
+        }
+    ]
+
+# Geçmişi göster
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.markdown(f"""
+        <div class="user-box">
+            {msg["content"]}
+        </div>
+        """, unsafe_allow_html=True)
+    elif msg["role"] == "assistant":
+        st.markdown(f"""
+        <div class="chat-box">
+            <strong>Ben:</strong> {msg["content"]}
+        </div>
+        """, unsafe_allow_html=True)
+
 # Input
 user_input = st.text_input("Bana yaz", placeholder="Bir şey sor…")
 
-# Cevap fonksiyonu
-def ben_cevap_ver(metin):
+def ben_cevap_ver():
     response = client.responses.create(
         model="gpt-4.1-mini",
-        input=f"""
-Senin adın Ben.
-Kısa, net, samimi konuş.
-Türkçe cevap ver.
-
-Kullanıcı: {metin}
-"""
+        input=st.session_state.messages
     )
     return response.output_text
 
-# Çalışma
+# Yeni mesaj
 if user_input:
+    # Kullanıcı mesajı kaydet
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
+    })
+
     with st.spinner("Ben düşünüyor…"):
         time.sleep(1)
-        cevap = ben_cevap_ver(user_input)
+        cevap = ben_cevap_ver()
 
-    st.markdown(f"""
-    <div class="chat-box">
-        <span class="dot"></span>
-        <strong>Ben:</strong> {cevap}
-    </div>
-    """, unsafe_allow_html=True)
+    # Ben cevabı kaydet
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": cevap
+    })
+
+    st.rerun()
