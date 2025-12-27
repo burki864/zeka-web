@@ -3,51 +3,64 @@ import streamlit as st
 from openai import OpenAI
 
 # =============================
-# OpenAI client
+# OpenAI Client
 # =============================
-client = OpenAI(
-    api_key=st.secrets["OPENAI_API_KEY"]
-)
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # =============================
-# Sayfa ayarı
+# Sayfa Ayarı
 # =============================
 st.set_page_config(
     page_title="Burak GPT",
+    page_icon="🤖",
     layout="centered"
 )
 
 # =============================
-# CSS
+# CSS (Profesyonel UI)
 # =============================
 st.markdown("""
 <style>
+body {
+    background-color: #fafafa;
+}
+.chat-container {
+    max-width: 720px;
+    margin: auto;
+}
+.chat-box {
+    background: #ffffff;
+    padding: 14px;
+    border-radius: 14px;
+    margin-top: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.user-box {
+    background: #dcf8c6;
+    padding: 12px;
+    border-radius: 14px;
+    margin-top: 10px;
+    text-align: right;
+}
 .dot {
-    width: 14px;
-    height: 14px;
-    background: black;
+    width: 12px;
+    height: 12px;
+    background: #333;
     border-radius: 50%;
     animation: pulse 1.2s infinite;
     display: inline-block;
-    margin-right: 8px;
+    margin-right: 6px;
 }
 @keyframes pulse {
     0% { transform: scale(1); opacity: .4; }
-    50% { transform: scale(1.6); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 1; }
     100% { transform: scale(1); opacity: .4; }
 }
-.chat-box {
-    background: #f5f5f5;
-    padding: 12px;
-    border-radius: 10px;
-    margin-top: 10px;
-}
-.user-box {
-    background: #e8e8e8;
-    padding: 10px;
-    border-radius: 10px;
-    margin-top: 10px;
-    text-align: right;
+.send-btn button {
+    width: 100%;
+    border-radius: 12px;
+    height: 42px;
+    font-size: 16px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -55,10 +68,11 @@ st.markdown("""
 # =============================
 # Başlık
 # =============================
-st.markdown("<h2>🤖 Burak GPT</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center;'>🤖 Burak GPT</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:gray;'>Samimi • Hızlı • Akıllı</p>", unsafe_allow_html=True)
 
 # =============================
-# HAFIZA
+# Hafıza
 # =============================
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -74,14 +88,10 @@ if "messages" not in st.session_state:
     ]
 
 # =============================
-# Gönderim kilidi
+# Mesajları Göster
 # =============================
-if "gonderildi" not in st.session_state:
-    st.session_state.gonderildi = False
+st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
 
-# =============================
-# Geçmiş mesajlar
-# =============================
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(
@@ -94,16 +104,22 @@ for msg in st.session_state.messages:
             unsafe_allow_html=True
         )
 
-# =============================
-# Input
-# =============================
-user_input = st.text_input(
-    "Burak GPT'ye yaz",
-    placeholder="Bir şey sor…"
-)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # =============================
-# Hafızayı metne çevir
+# Input + Buton
+# =============================
+with st.container():
+    user_input = st.text_area(
+        "Mesajın",
+        placeholder="Burak GPT’ye bir şey yaz…",
+        height=80
+    )
+
+    send = st.button("📨 Gönder", key="send", use_container_width=True)
+
+# =============================
+# Hafızayı Metne Çevir
 # =============================
 def hafiza_metni():
     metin = ""
@@ -112,7 +128,7 @@ def hafiza_metni():
     return metin
 
 # =============================
-# OpenAI cevap
+# OpenAI Cevap
 # =============================
 def burak_gpt_cevap():
     response = client.responses.create(
@@ -122,7 +138,7 @@ def burak_gpt_cevap():
     return response.output_text.strip()
 
 # =============================
-# Yavaş yazma
+# Yavaş Yazma
 # =============================
 def yavas_yaz(text):
     alan = st.empty()
@@ -133,17 +149,15 @@ def yavas_yaz(text):
             f"<div class='chat-box'><strong>Burak GPT:</strong> {yazilan}</div>",
             unsafe_allow_html=True
         )
-        time.sleep(0.06)
+        time.sleep(0.05)
 
 # =============================
-# Yeni mesaj
+# Gönderme Mantığı
 # =============================
-if user_input and not st.session_state.gonderildi:
-    st.session_state.gonderildi = True
-
+if send and user_input.strip():
     st.session_state.messages.append({
         "role": "user",
-        "content": user_input
+        "content": user_input.strip()
     })
 
     thinking = st.empty()
@@ -163,9 +177,3 @@ if user_input and not st.session_state.gonderildi:
     })
 
     st.rerun()
-
-# =============================
-# Input boşsa kilidi aç
-# =============================
-if not user_input:
-    st.session_state.gonderildi = False
