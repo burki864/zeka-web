@@ -1,44 +1,65 @@
 import streamlit as st
 import requests
-from io import BytesIO
-from PIL import Image
 from openai import OpenAI
-from gradio_client import Client
+from PIL import Image
+from io import BytesIO
 
 # ======================
-# PAGE
+# CONFIG
 # ======================
 st.set_page_config(
-    page_title="Burak GPT",
-    page_icon="🧠",
-    layout="centered"
+    page_title="🧠 Burak GPT",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+HF_SPACE = st.secrets["HF_SPACE_URL"]
+
+# ======================
+# STYLE
+# ======================
 st.markdown("""
 <style>
-body { background-color:#0f0f10; color:#f5f5f7; }
-.block-container { max-width:720px; }
-.chat-bubble {
-    padding:14px 18px;
-    border-radius:16px;
-    margin:10px 0;
-    line-height:1.5;
+body {
+    background: radial-gradient(circle at top, #1e1e2f, #0e0e16);
+    color: #ffffff;
 }
-.user { background:#1f1f22; text-align:right; }
-.bot { background:#161617; }
-.mode { font-size:12px; opacity:.6; text-align:center; }
-button { border-radius:10px !important; }
+.chat-box {
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 10px;
+}
+.user {
+    text-align: right;
+    color: #9ae6ff;
+}
+.bot {
+    text-align: left;
+    color: #ffffff;
+}
+.input-bar {
+    display: flex;
+    gap: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("## 🧠 Burak GPT")
-st.markdown("<div class='mode'>Think less. Build more.</div>", unsafe_allow_html=True)
+# ======================
+# HEADER
+# ======================
+st.markdown("## 🧠 **Burak GPT**")
+st.caption("Yazı • Araştırma • Görsel")
 
 # ======================
-# CLIENTS
+# MODE SELECT (3 DOTS)
 # ======================
-openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-image_client = Client("burak12321/burak-gpt-image")
+mode = st.selectbox(
+    "⠇",
+    ["Sohbet", "Araştırma", "Görsel"],
+    label_visibility="collapsed"
+)
 
 # ======================
 # SESSION
@@ -47,43 +68,55 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # ======================
+# CHAT HISTORY
+# ======================
+for role, msg in st.session_state.messages:
+    cls = "user" if role == "user" else "bot"
+    st.markdown(f"<div class='chat-box {cls}'>{msg}</div>", unsafe_allow_html=True)
+
+# ======================
+# INPUT
+# ======================
+col1, col2 = st.columns([8,1])
+with col1:
+    user_input = st.text_input(
+        "Ne soracaksın?",
+        placeholder="İstanbul manzarası, araştırma yap, sohbet edelim...",
+        label_visibility="collapsed"
+    )
+with col2:
+    send = st.button("➤")
+
+# ======================
 # FUNCTIONS
 # ======================
 def burak_gpt(prompt, mode):
-    styles = {
-        "Sohbet": "Kısa, zeki, kendinden emin konuş. Emoji dozunda 😎",
-        "Yazı": "Profesyonel, sade, akıcı yaz.",
-        "Araştırma": "Maddeli, net, öğretici anlat."
+    system = {
+        "Sohbet": "Samimi, zeki, emoji kullanan bir yapay zekasın.",
+        "Araştırma": "Maddeli, net, öğretici cevaplar ver."
     }
 
-    response = openai_client.responses.create(
-        model="gpt-4.1-mini",
-        input=[
-            {"role":"system","content":styles.get(mode,"")},
-            {"role":"user","content":prompt}
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system.get(mode, "")},
+            {"role": "user", "content": prompt}
         ]
     )
-    return response.output_text.strip()
+    return response.choices[0].message.content
+
 
 def generate_image(prompt):
-    try:
-        result = image_client.predict(prompt=prompt, api_name="/generate")
-        if isinstance(result, list):
-            result = result[0]
-        if result and result.get("url"):
-            img_data = requests.get(result["url"], timeout=60).content
-            return Image.open(BytesIO(img_data))
-    except:
-        return None
-
-# ======================
-# UI
-# ======================
-mode = st.selectbox("Mod", ["Sohbet", "Yazı", "Araştırma", "Görsel"])
-
-user_input = st.text_input("Mesaj", placeholder="Burak GPT’ye yaz…")
-
-send = st.button("Gönder")
+    r = requests.post(
+        HF_SPACE + "/predict",
+        json={"data":[prompt]},
+        timeout=120
+    )
+    if r.status_code == 200:
+        url = r.json()["data"][0]
+        img = requests.get(url).content
+        return img
+    return None
 
 # ======================
 # ACTION
@@ -91,27 +124,23 @@ send = st.button("Gönder")
 if send and user_input:
     st.session_state.messages.append(("user", user_input))
 
-    if mode == "Görsel":
-        with st.spinner("🎨 Görsel oluşturuluyor..."):
-            img = generate_image(user_input)
-
-        if img:
-            st.image(img, use_container_width=True)
-            buf = BytesIO()
-            img.save(buf, format="PNG")
-            st.download_button("⬇️ İndir", buf.getvalue(), "burak-gpt.png", "image/png")
+    with st.spinner("🧠 Burak GPT düşünüyor..."):
+        if mode == "Görsel":
+            img_bytes = generate_image(user_input)
+            if img_bytes:
+                image = Image.open(BytesIO(img_bytes))
+                st.image(image, use_container_width=True)
+                st.download_button(
+                    "⬇ Görseli indir",
+                    img_bytes,
+                    file_name="burak_gpt.png",
+                    mime="image/png"
+                )
+                st.session_state.messages.append(("bot", "🖼 Görsel hazır."))
+            else:
+                st.session_state.messages.append(("bot", "❌ Görsel üretilemedi."))
         else:
-            st.error("Görsel üretilemedi.")
-
-    else:
-        with st.spinner("🧠 Burak GPT düşünüyor..."):
             reply = burak_gpt(user_input, mode)
-        st.session_state.messages.append(("bot", reply))
+            st.session_state.messages.append(("bot", reply))
 
-# ======================
-# CHAT
-# ======================
-st.divider()
-for role, msg in st.session_state.messages[-12:]:
-    css = "user" if role == "user" else "bot"
-    st.markdown(f"<div class='chat-bubble {css}'>{msg}</div>", unsafe_allow_html=True)
+    st.rerun()
