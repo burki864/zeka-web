@@ -3,11 +3,7 @@ import time
 import requests
 from openai import OpenAI
 
-# ================== GÜVENLİ API OKUMA ==================
-if "OPENAI_API_KEY" not in st.secrets or "TAVILY_API_KEY" not in st.secrets:
-    st.error("API anahtarları Streamlit secrets içinde yok.")
-    st.stop()
-
+# ================== API ==================
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
 
@@ -21,31 +17,24 @@ st.set_page_config(
 # ================== CSS ==================
 st.markdown("""
 <style>
-.chat-container { max-width: 760px; margin:auto; }
+.chat-container { max-width: 760px; margin: auto; }
 .user-msg {
-    background:#DCF8C6;
-    padding:12px 16px;
-    border-radius:16px;
-    margin:8px 0;
-    text-align:right;
+    background:#DCF8C6; padding:12px 16px; border-radius:15px;
+    margin:8px 0; text-align:right;
 }
 .bot-msg {
-    background:#F1F0F0;
-    padding:12px 16px;
-    border-radius:16px;
+    background:#F1F0F0; padding:12px 16px; border-radius:15px;
     margin:8px 0;
 }
-.mode {
-    font-size:13px;
-    color:gray;
-    text-align:center;
+.input-row {
+    display:flex; gap:6px; align-items:center;
 }
 .send-btn button {
-    background:black;
-    color:white;
-    border-radius:10px;
-    width:42px;
-    height:42px;
+    background:black; color:white;
+    border-radius:10px; width:42px; height:42px;
+}
+.mode {
+    font-size:13px; color:gray; text-align:center;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -59,17 +48,27 @@ if "mode" not in st.session_state:
 
 # ================== BAŞLIK ==================
 st.markdown("<h2 style='text-align:center;'>🤖 Burak GPT</h2>", unsafe_allow_html=True)
-st.markdown(f"<p class='mode'>Mod: {st.session_state.mode.upper()}</p>", unsafe_allow_html=True)
+st.markdown(
+    f"<p class='mode'>Mod: {st.session_state.mode.upper()}</p>",
+    unsafe_allow_html=True
+)
 
-# ================== CHAT GEÇMİŞİ ==================
+# ================== CHAT ==================
 st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(f"<div class='user-msg'>{msg['content']}</div>", unsafe_allow_html=True)
+
     elif msg["role"] == "assistant":
-        st.markdown(f"<div class='bot-msg'><b>Burak GPT:</b> {msg['content']}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='bot-msg'><b>Burak GPT:</b> {msg['content']}</div>",
+            unsafe_allow_html=True
+        )
+
     elif msg["role"] == "image":
         st.image(msg["content"])
+
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ================== FONKSİYONLAR ==================
@@ -81,28 +80,37 @@ def tavily_search(query):
         "search_depth": "advanced",
         "max_results": 5
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = requests.post(url, json=payload)
     data = r.json()
-    return "\n".join([f"- {i['content']}" for i in data.get("results", [])])
 
-def gpt_chat(messages):
+    if "results" not in data:
+        return "Arama sonucu bulunamadı."
+
+    return "\n".join([f"- {i['content']}" for i in data["results"]])
+
+
+def gpt_text(prompt):
     res = client.responses.create(
         model="gpt-4.1-mini",
-        input=messages
+        input=prompt
     )
     return res.output_text.strip()
 
+
 def generate_image(prompt):
-    img = client.images.generate(
-        model="gpt-image-1",
-        prompt=prompt,
-        size="1024x1024"
-    )
-    return img.data[0].url
+    try:
+        img = client.images.generate(
+            model="gpt-image-1",
+            prompt=prompt,
+            size="1024x1024"
+        )
+        return img.data[0].url
+    except Exception:
+        return None
 
 # ================== INPUT ==================
 with st.form("chat_form", clear_on_submit=True):
-    col1, col2, col3 = st.columns([1,6,1])
+    col1, col2, col3 = st.columns([1, 6, 1])
 
     with col1:
         menu = st.selectbox(
@@ -137,13 +145,11 @@ if send and user_input.strip():
     })
 
     with st.spinner("Burak GPT düşünüyor..."):
-        time.sleep(0.5)
+        time.sleep(0.4)
 
         if st.session_state.mode == "chat":
-            reply = gpt_chat(
-                st.session_state.messages + [
-                    {"role": "system", "content": "Samimi, net, emoji kullanan bir asistansın."}
-                ]
+            reply = gpt_text(
+                f"Samimi, kısa, emoji kullanan bir Türkçe cevap ver:\n{user_input}"
             )
             st.session_state.messages.append({
                 "role": "assistant",
@@ -152,10 +158,9 @@ if send and user_input.strip():
 
         elif st.session_state.mode == "research":
             web = tavily_search(user_input)
-            reply = gpt_chat([
-                {"role": "system", "content": "Aşağıdaki internet sonuçlarına göre açık ve net cevap ver."},
-                {"role": "user", "content": web}
-            ])
+            reply = gpt_text(
+                f"Aşağıdaki internet sonuçlarını kullanarak açıkla:\n{web}"
+            )
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": reply
@@ -163,9 +168,16 @@ if send and user_input.strip():
 
         elif st.session_state.mode == "image":
             img_url = generate_image(user_input)
-            st.session_state.messages.append({
-                "role": "image",
-                "content": img_url
-            })
+
+            if img_url:
+                st.session_state.messages.append({
+                    "role": "image",
+                    "content": img_url
+                })
+            else:
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": "🖼️ Görsel oluşturulamadı. API yetkisi veya bakiye olmayabilir."
+                })
 
     st.rerun()
