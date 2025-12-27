@@ -34,4 +34,5 @@ if user_input:
         {"role": "assistant", "content": ai_reply}
     )
 
-    st.experimental_rerun()
+    st.rerun()
+
