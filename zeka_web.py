@@ -1,12 +1,15 @@
 import streamlit as st
 import time
-import random
 import requests
 from openai import OpenAI
 
-# ================== API ==================
+# ================== GÜVENLİ API OKUMA ==================
+if "OPENAI_API_KEY" not in st.secrets or "TAVILY_API_KEY" not in st.secrets:
+    st.error("API anahtarları Streamlit secrets içinde yok.")
+    st.stop()
+
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-TAVILY_API_KEY = st.secrets["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"]
+TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
 
 # ================== SAYFA ==================
 st.set_page_config(
@@ -18,27 +21,31 @@ st.set_page_config(
 # ================== CSS ==================
 st.markdown("""
 <style>
-.chat-container { max-width: 760px; margin: auto; }
+.chat-container { max-width: 760px; margin:auto; }
 .user-msg {
-    background:#DCF8C6; padding:12px 16px; border-radius:15px;
-    margin:8px 0; text-align:right;
+    background:#DCF8C6;
+    padding:12px 16px;
+    border-radius:16px;
+    margin:8px 0;
+    text-align:right;
 }
 .bot-msg {
-    background:#F1F0F0; padding:12px 16px; border-radius:15px;
+    background:#F1F0F0;
+    padding:12px 16px;
+    border-radius:16px;
     margin:8px 0;
 }
-.input-row {
-    display:flex; gap:6px; align-items:center;
-}
-.menu-btn button {
-    border-radius:10px; background:#eee;
+.mode {
+    font-size:13px;
+    color:gray;
+    text-align:center;
 }
 .send-btn button {
-    background:black; color:white;
-    border-radius:10px; width:42px; height:42px;
-}
-.mode {
-    font-size:13px; color:gray; text-align:center;
+    background:black;
+    color:white;
+    border-radius:10px;
+    width:42px;
+    height:42px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -52,12 +59,9 @@ if "mode" not in st.session_state:
 
 # ================== BAŞLIK ==================
 st.markdown("<h2 style='text-align:center;'>🤖 Burak GPT</h2>", unsafe_allow_html=True)
-st.markdown(
-    f"<p class='mode'>Mod: {st.session_state.mode.upper()}</p>",
-    unsafe_allow_html=True
-)
+st.markdown(f"<p class='mode'>Mod: {st.session_state.mode.upper()}</p>", unsafe_allow_html=True)
 
-# ================== CHAT ==================
+# ================== CHAT GEÇMİŞİ ==================
 st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
 for msg in st.session_state.messages:
     if msg["role"] == "user":
@@ -77,14 +81,14 @@ def tavily_search(query):
         "search_depth": "advanced",
         "max_results": 5
     }
-    r = requests.post(url, json=payload)
+    r = requests.post(url, json=payload, timeout=30)
     data = r.json()
-    return "\n".join([f"- {i['content']}" for i in data["results"]])
+    return "\n".join([f"- {i['content']}" for i in data.get("results", [])])
 
-def gpt_text(prompt):
+def gpt_chat(messages):
     res = client.responses.create(
         model="gpt-4.1-mini",
-        input=prompt
+        input=messages
     )
     return res.output_text.strip()
 
@@ -96,7 +100,7 @@ def generate_image(prompt):
     )
     return img.data[0].url
 
-# ================== INPUT ALANI ==================
+# ================== INPUT ==================
 with st.form("chat_form", clear_on_submit=True):
     col1, col2, col3 = st.columns([1,6,1])
 
@@ -117,7 +121,7 @@ with st.form("chat_form", clear_on_submit=True):
     with col3:
         send = st.form_submit_button("➤")
 
-# ================== MOD AYARI ==================
+# ================== MOD ==================
 if menu == "💬 Sohbet":
     st.session_state.mode = "chat"
 elif menu == "🔍 Araştırma":
@@ -136,8 +140,10 @@ if send and user_input.strip():
         time.sleep(0.5)
 
         if st.session_state.mode == "chat":
-            reply = gpt_text(
-                f"Samimi, kısa, emoji kullanarak cevap ver:\n{user_input}"
+            reply = gpt_chat(
+                st.session_state.messages + [
+                    {"role": "system", "content": "Samimi, net, emoji kullanan bir asistansın."}
+                ]
             )
             st.session_state.messages.append({
                 "role": "assistant",
@@ -146,9 +152,10 @@ if send and user_input.strip():
 
         elif st.session_state.mode == "research":
             web = tavily_search(user_input)
-            reply = gpt_text(
-                f"Aşağıdaki internet sonuçlarını kullanarak açıkla:\n{web}"
-            )
+            reply = gpt_chat([
+                {"role": "system", "content": "Aşağıdaki internet sonuçlarına göre açık ve net cevap ver."},
+                {"role": "user", "content": web}
+            ])
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": reply
