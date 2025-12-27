@@ -1,68 +1,70 @@
-import streamlit as st
 import time
+import streamlit as st
+from openai import OpenAI
 
+# OpenAI client
+client = OpenAI(
+    api_key=st.secrets["OPENAI_API_KEY"]
+)
+
+# Sayfa ayarı
 st.set_page_config(page_title="Ben", layout="centered")
 
 # CSS
 st.markdown("""
 <style>
 .dot {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
     background: black;
     border-radius: 50%;
-    animation: pulse 1.4s infinite;
+    animation: pulse 1.2s infinite;
     display: inline-block;
-    margin-right: 10px;
+    margin-right: 8px;
 }
 @keyframes pulse {
     0% { transform: scale(1); opacity: .4; }
     50% { transform: scale(1.6); opacity: 1; }
     100% { transform: scale(1); opacity: .4; }
 }
-.header {
-    font-size: 36px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.chat-box {
+    background: #f5f5f5;
+    padding: 12px;
+    border-radius: 10px;
+    margin-top: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown("""
-<div class="header">
-  <div class="dot"></div>
-  Ben
-</div>
-""", unsafe_allow_html=True)
+# Başlık
+st.markdown("<h2>👤 Ben</h2>", unsafe_allow_html=True)
 
-st.write("")  
-st.write("")  
+# Input
+user_input = st.text_input("Bana yaz", placeholder="Bir şey sor…")
 
-# Session
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Cevap fonksiyonu
+def ben_cevap_ver(metin):
+    response = client.responses.create(
+        model="gpt-4.1-mini",
+        input=f"""
+Senin adın Ben.
+Kısa, net, samimi konuş.
+Türkçe cevap ver.
 
-# Chat geçmişi
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+Kullanıcı: {metin}
+"""
+    )
+    return response.output_text
 
-# INPUT (ÖNEMLİ KISIM)
-prompt = st.chat_input("Bana yaz…")
+# Çalışma
+if user_input:
+    with st.spinner("Ben düşünüyor…"):
+        time.sleep(1)
+        cevap = ben_cevap_ver(user_input)
 
-if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    with st.chat_message("user"):
-        st.write(prompt)
-
-    with st.chat_message("assistant"):
-        with st.spinner("Ben düşünüyorum…"):
-            time.sleep(1.2)
-        cevap = f"Bunu düşündüm: {prompt}"
-        st.write(cevap)
-
-    st.session_state.messages.append({"role": "assistant", "content": cevap})
+    st.markdown(f"""
+    <div class="chat-box">
+        <span class="dot"></span>
+        <strong>Ben:</strong> {cevap}
+    </div>
+    """, unsafe_allow_html=True)
