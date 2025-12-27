@@ -2,15 +2,24 @@ import time
 import streamlit as st
 from openai import OpenAI
 
+# =============================
 # OpenAI client
+# =============================
 client = OpenAI(
     api_key=st.secrets["OPENAI_API_KEY"]
 )
 
+# =============================
 # Sayfa ayarı
-st.set_page_config(page_title="Ben", layout="centered")
+# =============================
+st.set_page_config(
+    page_title="Burak GPT",
+    layout="centered"
+)
 
+# =============================
 # CSS
+# =============================
 st.markdown("""
 <style>
 .dot {
@@ -43,19 +52,30 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# =============================
 # Başlık
-st.markdown("<h2>👤 Ben</h2>", unsafe_allow_html=True)
+# =============================
+st.markdown("<h2>🤖 Burak GPT</h2>", unsafe_allow_html=True)
 
-# 🧠 HAFIZA
+# =============================
+# HAFIZA
+# =============================
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
             "role": "system",
-            "content": "Senin adın Ben. Samimi, net ve kısa cevap ver. Türkçe konuş."
+            "content": (
+                "Senin adın Burak GPT. "
+                "Samimi, kısa ve insan gibi cevap ver. "
+                "Bazen düşündüğünü belli et. "
+                "Türkçe konuş."
+            )
         }
     ]
 
-# Geçmişi göster
+# =============================
+# Geçmiş mesajları göster
+# =============================
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(f"""
@@ -63,24 +83,51 @@ for msg in st.session_state.messages:
             {msg["content"]}
         </div>
         """, unsafe_allow_html=True)
+
     elif msg["role"] == "assistant":
         st.markdown(f"""
         <div class="chat-box">
-            <strong>Ben:</strong> {msg["content"]}
+            <strong>Burak GPT:</strong> {msg["content"]}
         </div>
         """, unsafe_allow_html=True)
 
+# =============================
 # Input
-user_input = st.text_input("Bana yaz", placeholder="Bir şey sor…")
+# =============================
+user_input = st.text_input(
+    "Burak GPT'ye yaz",
+    placeholder="Bir şey sor…",
+    key="input"
+)
 
-def ben_cevap_ver():
+# =============================
+# OpenAI cevap fonksiyonu
+# =============================
+def burak_gpt_cevap():
     response = client.responses.create(
         model="gpt-4.1-mini",
-        input=st.session_state.messages
+        messages=st.session_state.messages
     )
     return response.output_text
 
+# =============================
+# Yavaş yazma efekti
+# =============================
+def yavas_yaz(text):
+    alan = st.empty()
+    yazilan = ""
+    for kelime in text.split():
+        yazilan += kelime + " "
+        alan.markdown(f"""
+        <div class="chat-box">
+            <strong>Burak GPT:</strong> {yazilan}
+        </div>
+        """, unsafe_allow_html=True)
+        time.sleep(0.08)
+
+# =============================
 # Yeni mesaj
+# =============================
 if user_input:
     # Kullanıcı mesajı kaydet
     st.session_state.messages.append({
@@ -88,14 +135,29 @@ if user_input:
         "content": user_input
     })
 
-    with st.spinner("Ben düşünüyor…"):
-        time.sleep(1)
-        cevap = ben_cevap_ver()
+    # Düşünüyor animasyonu
+    thinking = st.empty()
+    thinking.markdown("""
+    <div class="dot"></div> Burak GPT düşünüyor...
+    """, unsafe_allow_html=True)
 
-    # Ben cevabı kaydet
+    # Cevap al
+    cevap = burak_gpt_cevap()
+
+    # Animasyonu kaldır
+    thinking.empty()
+
+    # Yavaş yaz
+    yavas_yaz(cevap)
+
+    # Cevabı hafızaya ekle
     st.session_state.messages.append({
         "role": "assistant",
         "content": cevap
     })
 
+    # Input temizle
+    st.session_state.input = ""
+
+    # Yeniden çiz
     st.rerun()
