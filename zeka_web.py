@@ -74,42 +74,36 @@ if "messages" not in st.session_state:
     ]
 
 # =============================
-# Geçmiş mesajları göster
+# Geçmiş mesajlar
 # =============================
 for msg in st.session_state.messages:
     if msg["role"] == "user":
-        st.markdown(f"""
-        <div class="user-box">{msg["content"]}</div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(
+            f"<div class='user-box'>{msg['content']}</div>",
+            unsafe_allow_html=True
+        )
     elif msg["role"] == "assistant":
-        st.markdown(f"""
-        <div class="chat-box">
-            <strong>Burak GPT:</strong> {msg["content"]}
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='chat-box'><strong>Burak GPT:</strong> {msg['content']}</div>",
+            unsafe_allow_html=True
+        )
 
 # =============================
 # Input
 # =============================
 user_input = st.text_input(
     "Burak GPT'ye yaz",
-    placeholder="Bir şey sor…",
-    key="input"
+    placeholder="Bir şey sor…"
 )
 
 # =============================
-# Hafızayı stringe çevir
+# Hafızayı metne çevir
 # =============================
 def hafiza_metni():
     metin = ""
     for m in st.session_state.messages:
-        if m["role"] == "system":
-            metin += f"SYSTEM: {m['content']}\n"
-        elif m["role"] == "user":
-            metin += f"KULLANICI: {m['content']}\n"
-        elif m["role"] == "assistant":
-            metin += f"BURAK GPT: {m['content']}\n"
+        rol = m["role"].upper()
+        metin += f"{rol}: {m['content']}\n"
     return metin
 
 # =============================
@@ -123,19 +117,18 @@ def burak_gpt_cevap():
     return response.output_text.strip()
 
 # =============================
-# Yavaş yazma efekti
+# Yavaş yazma
 # =============================
 def yavas_yaz(text):
     alan = st.empty()
     yazilan = ""
     for kelime in text.split():
         yazilan += kelime + " "
-        alan.markdown(f"""
-        <div class="chat-box">
-            <strong>Burak GPT:</strong> {yazilan}
-        </div>
-        """, unsafe_allow_html=True)
-        time.sleep(0.07)
+        alan.markdown(
+            f"<div class='chat-box'><strong>Burak GPT:</strong> {yazilan}</div>",
+            unsafe_allow_html=True
+        )
+        time.sleep(0.06)
 
 # =============================
 # Yeni mesaj
@@ -147,9 +140,10 @@ if user_input:
     })
 
     thinking = st.empty()
-    thinking.markdown("""
-    <div class="dot"></div> Burak GPT düşünüyor...
-    """, unsafe_allow_html=True)
+    thinking.markdown(
+        "<div class='dot'></div> Burak GPT düşünüyor...",
+        unsafe_allow_html=True
+    )
 
     cevap = burak_gpt_cevap()
 
@@ -161,5 +155,4 @@ if user_input:
         "content": cevap
     })
 
-    st.session_state.input = ""
     st.rerun()
