@@ -74,6 +74,12 @@ if "messages" not in st.session_state:
     ]
 
 # =============================
+# Gönderim kilidi
+# =============================
+if "gonderildi" not in st.session_state:
+    st.session_state.gonderildi = False
+
+# =============================
 # Geçmiş mesajlar
 # =============================
 for msg in st.session_state.messages:
@@ -102,8 +108,7 @@ user_input = st.text_input(
 def hafiza_metni():
     metin = ""
     for m in st.session_state.messages:
-        rol = m["role"].upper()
-        metin += f"{rol}: {m['content']}\n"
+        metin += f"{m['role'].upper()}: {m['content']}\n"
     return metin
 
 # =============================
@@ -133,7 +138,9 @@ def yavas_yaz(text):
 # =============================
 # Yeni mesaj
 # =============================
-if user_input:
+if user_input and not st.session_state.gonderildi:
+    st.session_state.gonderildi = True
+
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
@@ -156,3 +163,9 @@ if user_input:
     })
 
     st.rerun()
+
+# =============================
+# Input boşsa kilidi aç
+# =============================
+if not user_input:
+    st.session_state.gonderildi = False
