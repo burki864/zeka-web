@@ -43,17 +43,28 @@ def generate_image(prompt):
         "Authorization": f"Bearer {st.secrets['HF_TOKEN']}"
     }
 
-    response = requests.post(
-        API_URL,
-        headers=headers,
-        json={"inputs": prompt},
-        timeout=60
-    )
+    for _ in range(3):  # 3 kere dene
+        response = requests.post(
+            API_URL,
+            headers=headers,
+            json={"inputs": prompt},
+            timeout=60
+        )
 
-    if response.status_code != 200:
-        return None
+        # Başarılıysa
+        if response.status_code == 200:
+            return response.content
 
-    return response.content
+        # Model yükleniyorsa bekle
+        if response.status_code == 503:
+            st.info("🧠 Model yükleniyor, bekleniyor...")
+            import time
+            time.sleep(5)
+            continue
+
+        break
+
+    return None
 
 # ------------------ CHAT GEÇMİŞİ ------------------
 for msg in st.session_state.messages:
