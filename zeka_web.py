@@ -1,38 +1,70 @@
 import streamlit as st
-from openai import OpenAI
+import time
+import random
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+st.set_page_config(page_title="Ben", page_icon="⚫")
 
-st.set_page_config(page_title="Benim Yapay Zekam", page_icon="🤖")
-st.title("🤖 Benim Yapay Zekam")
-st.write("Her gün biraz daha gelişiyorum.")
+# CSS – nabız atan siyah nokta
+st.markdown("""
+<style>
+.thinking-dot {
+  width: 14px;
+  height: 14px;
+  background-color: black;
+  border-radius: 50%;
+  animation: pulse 1.2s infinite ease-in-out;
+  margin: 10px 0;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.7); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.7); opacity: 0.5; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("⚫ Ben")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        st.markdown(f"🧑 **Sen:** {msg['content']}")
-    else:
-        st.markdown(f"🤖 **AI:** {msg['content']}")
+# Eski mesajları göster
+for role, content in st.session_state.messages:
+    with st.chat_message(role):
+        st.markdown(content)
 
-user_input = st.text_input("Sen:")
+# Kullanıcı girişi
+prompt = st.chat_input("Bana yaz...")
 
-if user_input:
-    st.session_state.messages.append(
-        {"role": "user", "content": user_input}
-    )
+if prompt:
+    # Kullanıcı mesajı
+    st.session_state.messages.append(("user", prompt))
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=st.session_state.messages
-    )
+    # Ben düşünüyorum efekti
+    with st.chat_message("assistant"):
+        dot = st.empty()
+        text = st.empty()
 
-    ai_reply = response.choices[0].message.content
+        thinking_texts = [
+            "🧠 Bir bakıyorum...",
+            "🤔 Düşünüyorum...",
+            "🔍 Araştırıyorum...",
+            "⏳ Bir saniye..."
+        ]
 
-    st.session_state.messages.append(
-        {"role": "assistant", "content": ai_reply}
-    )
+        dot.markdown('<div class="thinking-dot"></div>', unsafe_allow_html=True)
+        text.markdown(random.choice(thinking_texts))
 
-    st.rerun()
+        time.sleep(random.uniform(1.5, 2.5))
 
+        dot.empty()
+        text.empty()
+
+        # Demo cevap (buraya AI bağlanır)
+        response = f"Tamam, anladım. **{prompt}** hakkında konuşabiliriz."
+
+        st.markdown(response)
+        st.session_state.messages.append(("assistant", response))
