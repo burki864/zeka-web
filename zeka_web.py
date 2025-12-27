@@ -1,12 +1,13 @@
 import streamlit as st
+import requests
+from openai import OpenAI
 from gradio_client import Client
 from PIL import Image
 from io import BytesIO
-import requests
 
-# =====================
+# ======================
 # PAGE
-# =====================
+# ======================
 st.set_page_config(
     page_title="Burak GPT",
     page_icon="🧠",
@@ -14,99 +15,113 @@ st.set_page_config(
 )
 
 st.markdown("## 🧠 Burak GPT")
-st.caption("Yazı · Araştırma · Görsel")
+st.caption("Yazı • Araştırma • Görsel")
 
-# =====================
-# STATE
-# =====================
-if "history" not in st.session_state:
-    st.session_state.history = []
+# ======================
+# CLIENTS
+# ======================
+openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+image_client = Client("burak12321/burak-gpt-image")
 
-# =====================
-# IMAGE SERVICE
-# =====================
-def generate_image(prompt: str):
+# ======================
+# SESSION
+# ======================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# ======================
+# AI FUNCTIONS
+# ======================
+def gpt_response(prompt, mode):
+    system_prompt = {
+        "Sohbet": "Samimi, zeki, özgüvenli konuş. Az ama etkili emoji kullan 😎🚀",
+        "Yazı": "Profesyonel, net, düzgün paragraflar yaz.",
+        "Araştırma": "Ciddi, maddeli, öğretici anlat."
+    }
+
+    res = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt.get(mode, "")},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return res.choices[0].message.content
+
+
+def generate_image(prompt):
     try:
-        client = Client("burak12321/burak-gpt-image")
-        result = client.predict(prompt=prompt, api_name="/generate")
+        result = image_client.predict(
+            prompt=prompt,
+            api_name="/generate"
+        )
 
         if isinstance(result, list):
             result = result[0]
 
         if result and result.get("url"):
-            r = requests.get(result["url"], timeout=45)
-            return Image.open(BytesIO(r.content)).convert("RGB")
+            r = requests.get(result["url"], timeout=60)
+            img = Image.open(BytesIO(r.content)).convert("RGB")
+            return img
     except:
         pass
+
     return None
 
-# =====================
-# TEXT SERVICE
-# =====================
-def generate_text(prompt, mode):
-    if mode == "Yazı":
-        return f"{prompt}\n\nBu konu üzerine sade, anlaşılır ve özgün bir metin hazırlandı."
-
-    if mode == "Araştırma":
-        return (
-            f"{prompt}\n\n"
-            f"- Tanım\n"
-            f"- Kullanım alanları\n"
-            f"- Avantajlar\n"
-            f"- Güncel örnekler"
-        )
-
-    return f"{prompt} üzerine konuşabiliriz. Detaylandırmak ister misin?"
-
-# =====================
+# ======================
 # UI
-# =====================
+# ======================
 mode = st.selectbox(
     "Mod",
     ["Sohbet", "Yazı", "Araştırma", "Görsel"]
 )
 
-prompt = st.text_input(
-    "Girdi",
-    placeholder="örn: istanbul manzarası"
+user_input = st.text_input(
+    "Mesaj",
+    placeholder="Burak GPT’ye yaz…"
 )
 
 send = st.button("Gönder")
 
-# =====================
+# ======================
 # ACTION
-# =====================
-if send and prompt:
+# ======================
+if send and user_input:
+
+    st.session_state.messages.append(("Sen", user_input))
 
     if mode == "Görsel":
-        with st.spinner("Görsel oluşturuluyor..."):
-            img = generate_image(prompt)
+        with st.spinner("🎨 Görsel oluşturuluyor..."):
+            img = generate_image(user_input)
 
         if img:
             st.image(img, use_container_width=True)
 
-            buffer = BytesIO()
-            img.save(buffer, format="PNG")
+            buf = BytesIO()
+            img.save(buf, format="PNG")
 
             st.download_button(
-                "İndir",
-                buffer.getvalue(),
+                "⬇️ Görseli indir",
+                buf.getvalue(),
                 "burak-gpt.png",
                 "image/png"
             )
         else:
-            st.warning("Görsel üretilemedi.")
+            st.error("❌ Görsel üretilemedi.")
 
     else:
-        with st.spinner("Yanıt hazırlanıyor..."):
-            answer = generate_text(prompt, mode)
+        with st.spinner("🧠 Burak GPT düşünüyor..."):
+            reply = gpt_response(user_input, mode)
 
-        st.session_state.history.append((prompt, answer))
+        st.session_state.messages.append(("Burak GPT", reply))
 
-# =====================
-# HISTORY
-# =====================
-for q, a in reversed(st.session_state.history[-5:]):
-    st.markdown(f"**Sen:** {q}")
-    st.markdown(f"**Burak GPT:** {a}")
-    st.divider()
+# ======================
+# CHAT HISTORY
+# ======================
+st.divider()
+
+for role, msg in st.session_state.messages[-10:]:
+    if role == "Sen":
+        st.markdown(f"**🧍 {role}:** {msg}")
+    else:
+        st.markdown(f"**🤖 {role}:** {msg}")
