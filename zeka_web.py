@@ -79,9 +79,7 @@ if "messages" not in st.session_state:
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(f"""
-        <div class="user-box">
-            {msg["content"]}
-        </div>
+        <div class="user-box">{msg["content"]}</div>
         """, unsafe_allow_html=True)
 
     elif msg["role"] == "assistant":
@@ -101,14 +99,28 @@ user_input = st.text_input(
 )
 
 # =============================
-# OpenAI cevap fonksiyonu
+# Hafızayı stringe çevir
+# =============================
+def hafiza_metni():
+    metin = ""
+    for m in st.session_state.messages:
+        if m["role"] == "system":
+            metin += f"SYSTEM: {m['content']}\n"
+        elif m["role"] == "user":
+            metin += f"KULLANICI: {m['content']}\n"
+        elif m["role"] == "assistant":
+            metin += f"BURAK GPT: {m['content']}\n"
+    return metin
+
+# =============================
+# OpenAI cevap
 # =============================
 def burak_gpt_cevap():
     response = client.responses.create(
         model="gpt-4.1-mini",
-        messages=st.session_state.messages
+        input=hafiza_metni()
     )
-    return response.output_text
+    return response.output_text.strip()
 
 # =============================
 # Yavaş yazma efekti
@@ -123,41 +135,31 @@ def yavas_yaz(text):
             <strong>Burak GPT:</strong> {yazilan}
         </div>
         """, unsafe_allow_html=True)
-        time.sleep(0.08)
+        time.sleep(0.07)
 
 # =============================
 # Yeni mesaj
 # =============================
 if user_input:
-    # Kullanıcı mesajı kaydet
     st.session_state.messages.append({
         "role": "user",
         "content": user_input
     })
 
-    # Düşünüyor animasyonu
     thinking = st.empty()
     thinking.markdown("""
     <div class="dot"></div> Burak GPT düşünüyor...
     """, unsafe_allow_html=True)
 
-    # Cevap al
     cevap = burak_gpt_cevap()
 
-    # Animasyonu kaldır
     thinking.empty()
-
-    # Yavaş yaz
     yavas_yaz(cevap)
 
-    # Cevabı hafızaya ekle
     st.session_state.messages.append({
         "role": "assistant",
         "content": cevap
     })
 
-    # Input temizle
     st.session_state.input = ""
-
-    # Yeniden çiz
     st.rerun()
